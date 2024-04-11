@@ -97,6 +97,10 @@ impl QoobDevice {
 		self.send_buffer(&buf)
 	}
 
+	/// Acquires some kind of lock.
+	///
+	/// Flash access will not work without this.
+	/// This is most likely to protect against concurrent access by the GameCube.
 	fn get_bus(&self) -> QoobResult<()> {
 		let mut buf = [0; HID_BUFFER_SIZE];
 		buf[1] = QoobCmd::Bus as _;
@@ -114,6 +118,7 @@ impl QoobDevice {
 		}
 	}
 
+	/// Releases the bus lock.
 	fn release_bus(&self) -> QoobResult<()> {
 		let mut buf = [0; HID_BUFFER_SIZE];
 		buf[1] = QoobCmd::Bus as _;
@@ -128,6 +133,7 @@ impl QoobDevice {
 		}
 	}
 
+	/// Reads up to 32KiB from flash.
 	pub fn read(&self, offset: u32, dest: &mut [u8]) -> QoobResult<()> {
 		assert!(dest.len() <= MAX_TRANSFER_SIZE);
 		assert!(offset as usize + dest.len() <= FLASH_SIZE);
