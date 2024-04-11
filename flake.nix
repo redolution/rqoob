@@ -43,17 +43,23 @@
 
             devShells.default = pkgs.callPackage
               ({ mkShell
+              , pkg-config
               , rust-bin
+              , udev
               }: mkShell {
                 name = "cubane";
                 nativeBuildInputs = [
-                  # RTIC 2.0 currently requires nightly
+                  pkg-config
                   (rust-bin.stable.latest.default.override {
                     extensions = [
                       "rust-analyzer"
                       "rust-src"
                     ];
                   })
+                ];
+
+                buildInputs = [
+                  udev
                 ];
               })
               { };
