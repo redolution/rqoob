@@ -4,6 +4,7 @@ use error::{QoobError, QoobResult};
 const HID_BUFFER_SIZE: usize = 65;
 const DATA_TRANSFER_UNIT: usize = 63;
 const MAX_TRANSFER_SIZE: usize = 0x8000;
+const SECTOR_SIZE: usize = 0x1_0000;
 const FLASH_SIZE: usize = 0x20_0000;
 
 #[repr(u8)]
@@ -153,6 +154,52 @@ impl QoobDevice {
 		for chunk in dest.chunks_mut(DATA_TRANSFER_UNIT) {
 			let buf = self.receive_buffer()?;
 			chunk.copy_from_slice(&buf[2..2 + chunk.len()]);
+		}
+		Ok(())
+	}
+
+	/// Erases a sector
+	pub fn erase(&self, sector: u8) -> QoobResult<()> {
+		assert!((sector as usize) < FLASH_SIZE / SECTOR_SIZE);
+		let mut buf = [0; HID_BUFFER_SIZE];
+		buf[1] = QoobCmd::Erase as _;
+		buf[2] = sector;
+		// Presumably these are part of the offset argument,
+		// but impossible to erase at an address that's not sector-aligned.
+		// Regardless, the Windows flasher writes buf[3] as a 16 bit values, so let's preserve it.
+		buf[3] = 0;
+		buf[4] = 0;
+		self.send_buffer(&buf)?;
+
+		loop {
+			let status = self.status()?[2];
+			if status == 0 {
+				return Ok(());
+			}
+		}
+	}
+
+	/// Writes up to 32KiB to flash.
+	pub fn write(&self, offset: u32, source: &[u8]) -> QoobResult<()> {
+		assert!(source.len() <= MAX_TRANSFER_SIZE);
+		assert!(offset as usize + source.len() <= FLASH_SIZE);
+
+		let mut buf = [0; HID_BUFFER_SIZE];
+		buf[1] = QoobCmd::Write as _;
+
+		buf[2] = (offset >> 16) as u8;
+		buf[3] = (offset >> 8) as u8;
+		buf[4] = offset as u8;
+
+		buf[5] = (buf.len() >> 8) as u8;
+		buf[6] = buf.len() as u8;
+
+		self.send_buffer(&buf)?;
+
+		for chunk in source.chunks(DATA_TRANSFER_UNIT) {
+			let mut buf = [0; HID_BUFFER_SIZE];
+			buf[2..2 + chunk.len()].copy_from_slice(chunk);
+			self.send_buffer(&buf)?;
 		}
 		Ok(())
 	}
