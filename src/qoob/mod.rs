@@ -3,9 +3,11 @@ use error::{QoobError, QoobResult};
 
 const HID_BUFFER_SIZE: usize = 65;
 const DATA_TRANSFER_UNIT: usize = 63;
-const MAX_TRANSFER_SIZE: usize = 0x8000;
-const SECTOR_SIZE: usize = 0x1_0000;
-const FLASH_SIZE: usize = 0x20_0000;
+const MAX_TRANSFER_SIZE: usize = 32 * 1024;
+
+const SECTOR_SIZE: usize = 64 * 1024;
+const SECTOR_COUNT: usize = 32;
+const FLASH_SIZE: usize = SECTOR_COUNT * SECTOR_SIZE;
 
 #[repr(u8)]
 enum QoobCmd {
@@ -164,7 +166,7 @@ impl QoobDevice {
 
 	/// Erases a sector
 	pub fn erase(&self, sector: u8) -> QoobResult<()> {
-		assert!((sector as usize) < FLASH_SIZE / SECTOR_SIZE);
+		assert!((sector as usize) < SECTOR_COUNT);
 		let mut buf = [0; HID_BUFFER_SIZE];
 		buf[1] = QoobCmd::Erase as _;
 		buf[2] = sector;
