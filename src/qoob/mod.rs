@@ -26,13 +26,17 @@ impl QoobDevice {
 	///
 	/// An error is raised if more than one is connected.
 	pub fn connect() -> QoobResult<Self> {
-		let mut api = hidapi::HidApi::new()?;
+		let api = hidapi::HidApi::new()?;
 
 		// Filter the list
-		api.reset_devices()?;
-		api.add_devices(0x03eb, 0x0001)?;
+		let mut devs = api.device_list().filter(|info| {
+			matches!(info.bus_type(), hidapi::BusType::Usb)
+				&& info.vendor_id() == 0x03eb // Atmel Corp.
+				&& info.product_id() == 0x0001 // Not listed in usb.ids
+				&& info.manufacturer_string() == Some("QooB Team")
+				&& info.product_string() == Some("QOOB Chip Pro")
+		});
 
-		let mut devs = api.device_list();
 		let dev = devs.next().ok_or(QoobError::NoDev)?;
 
 		if devs.next().is_some() {
