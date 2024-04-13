@@ -23,7 +23,7 @@ pub struct QoobDevice {
 }
 
 impl QoobDevice {
-	/// Connects to the device.
+	/// Connect to the device.
 	///
 	/// An error is raised if more than one is connected.
 	pub fn connect() -> QoobResult<Self> {
@@ -82,7 +82,7 @@ impl QoobDevice {
 		}
 	}
 
-	/// Queries the device's status.
+	/// Query the device's status.
 	fn status(&self) -> QoobResult<[u8; HID_BUFFER_SIZE]> {
 		let mut buf = [0; HID_BUFFER_SIZE];
 		buf[1] = QoobCmd::Status as _;
@@ -91,7 +91,7 @@ impl QoobDevice {
 		self.receive_buffer()
 	}
 
-	/// Resets the device.
+	/// Reset the device.
 	///
 	/// Takes self by move because it will cause the connection to drop.
 	///
@@ -102,7 +102,7 @@ impl QoobDevice {
 		self.send_buffer(&buf)
 	}
 
-	/// Acquires some kind of lock.
+	/// Acquire some kind of lock.
 	///
 	/// Flash access will not work without this.
 	/// This is most likely to protect against concurrent access by the GameCube.
@@ -123,7 +123,7 @@ impl QoobDevice {
 		}
 	}
 
-	/// Releases the bus lock.
+	/// Release the bus lock.
 	fn release_bus(&self) -> QoobResult<()> {
 		let mut buf = [0; HID_BUFFER_SIZE];
 		buf[1] = QoobCmd::Bus as _;
@@ -138,7 +138,7 @@ impl QoobDevice {
 		}
 	}
 
-	/// Reads up to [`MAX_TRANSFER_SIZE`] bytes from flash.
+	/// Read up to [`MAX_TRANSFER_SIZE`] bytes from flash.
 	fn read_raw(&self, offset: usize, dest: &mut [u8]) -> QoobResult<()> {
 		assert!(dest.len() <= MAX_TRANSFER_SIZE);
 		assert!(offset + dest.len() <= FLASH_SIZE);
@@ -162,7 +162,7 @@ impl QoobDevice {
 		Ok(())
 	}
 
-	/// Reads data from flash
+	/// Read data from flash
 	pub fn read(&self, offset: usize, dest: &mut [u8]) -> QoobResult<()> {
 		assert!(offset + dest.len() <= FLASH_SIZE);
 		let mut cursor = offset;
@@ -173,7 +173,7 @@ impl QoobDevice {
 		Ok(())
 	}
 
-	/// Erases a sector
+	/// Erase a sector
 	pub fn erase(&self, sector: usize) -> QoobResult<()> {
 		assert!(sector < SECTOR_COUNT);
 		let mut buf = [0; HID_BUFFER_SIZE];
@@ -194,7 +194,7 @@ impl QoobDevice {
 		}
 	}
 
-	/// Erases a range of sectors
+	/// Erase a range of sectors
 	pub fn erase_range(&self, sectors: std::ops::Range<usize>) -> QoobResult<()> {
 		assert!(sectors.start < SECTOR_COUNT);
 		assert!(sectors.end <= SECTOR_COUNT);
@@ -204,7 +204,7 @@ impl QoobDevice {
 		Ok(())
 	}
 
-	/// Writes up to [`MAX_TRANSFER_SIZE`] bytes to flash.
+	/// Write up to [`MAX_TRANSFER_SIZE`] bytes to flash.
 	fn write_raw(&self, offset: usize, source: &[u8]) -> QoobResult<()> {
 		assert!(source.len() <= MAX_TRANSFER_SIZE);
 		assert!(offset + source.len() <= FLASH_SIZE);
@@ -229,7 +229,7 @@ impl QoobDevice {
 		Ok(())
 	}
 
-	/// Writes data to flash
+	/// Write data to flash
 	pub fn write(&self, offset: usize, source: &[u8]) -> QoobResult<()> {
 		assert!(offset + source.len() <= FLASH_SIZE);
 		let mut cursor = offset;
