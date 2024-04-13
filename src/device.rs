@@ -139,9 +139,9 @@ impl QoobDevice {
 	}
 
 	/// Reads up to [`MAX_TRANSFER_SIZE`] bytes from flash.
-	pub fn read(&self, offset: u32, dest: &mut [u8]) -> QoobResult<()> {
+	fn read_raw(&self, offset: usize, dest: &mut [u8]) -> QoobResult<()> {
 		assert!(dest.len() <= MAX_TRANSFER_SIZE);
-		assert!(offset as usize + dest.len() <= FLASH_SIZE);
+		assert!(offset + dest.len() <= FLASH_SIZE);
 
 		let mut buf = [0; HID_BUFFER_SIZE];
 		buf[1] = QoobCmd::Read as _;
@@ -158,6 +158,17 @@ impl QoobDevice {
 		for chunk in dest.chunks_mut(DATA_TRANSFER_UNIT) {
 			let buf = self.receive_buffer()?;
 			chunk.copy_from_slice(&buf[2..2 + chunk.len()]);
+		}
+		Ok(())
+	}
+
+	/// Reads data from flash
+	pub fn read(&self, offset: usize, dest: &mut [u8]) -> QoobResult<()> {
+		assert!(offset + dest.len() <= FLASH_SIZE);
+		let mut cursor = offset;
+		for chunk in dest.chunks_mut(MAX_TRANSFER_SIZE) {
+			self.read_raw(cursor, chunk)?;
+			cursor += chunk.len();
 		}
 		Ok(())
 	}
@@ -183,10 +194,20 @@ impl QoobDevice {
 		}
 	}
 
+	/// Erases a range of sectors
+	pub fn erase_range(&self, sectors: std::ops::Range<u8>) -> QoobResult<()> {
+		assert!((sectors.start as usize) < SECTOR_COUNT);
+		assert!((sectors.end as usize) <= SECTOR_COUNT);
+		for sector in sectors {
+			self.erase(sector)?;
+		}
+		Ok(())
+	}
+
 	/// Writes up to [`MAX_TRANSFER_SIZE`] bytes to flash.
-	pub fn write(&self, offset: u32, source: &[u8]) -> QoobResult<()> {
+	fn write_raw(&self, offset: usize, source: &[u8]) -> QoobResult<()> {
 		assert!(source.len() <= MAX_TRANSFER_SIZE);
-		assert!(offset as usize + source.len() <= FLASH_SIZE);
+		assert!(offset + source.len() <= FLASH_SIZE);
 
 		let mut buf = [0; HID_BUFFER_SIZE];
 		buf[1] = QoobCmd::Write as _;
@@ -204,6 +225,17 @@ impl QoobDevice {
 			let mut buf = [0; HID_BUFFER_SIZE];
 			buf[2..2 + chunk.len()].copy_from_slice(chunk);
 			self.send_buffer(&buf)?;
+		}
+		Ok(())
+	}
+
+	/// Writes data to flash
+	pub fn write(&self, offset: usize, source: &[u8]) -> QoobResult<()> {
+		assert!(offset + source.len() <= FLASH_SIZE);
+		let mut cursor = offset;
+		for chunk in source.chunks(MAX_TRANSFER_SIZE) {
+			self.write_raw(cursor, chunk)?;
+			cursor += chunk.len();
 		}
 		Ok(())
 	}
