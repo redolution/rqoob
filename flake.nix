@@ -47,7 +47,7 @@
               , rust-bin
               , udev
               }: mkShell {
-                name = "cubane";
+                name = "rqoob";
                 nativeBuildInputs = [
                   pkg-config
                   (rust-bin.stable.latest.default.override {
