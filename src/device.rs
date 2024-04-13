@@ -174,11 +174,11 @@ impl QoobDevice {
 	}
 
 	/// Erases a sector
-	pub fn erase(&self, sector: u8) -> QoobResult<()> {
-		assert!((sector as usize) < SECTOR_COUNT);
+	pub fn erase(&self, sector: usize) -> QoobResult<()> {
+		assert!(sector < SECTOR_COUNT);
 		let mut buf = [0; HID_BUFFER_SIZE];
 		buf[1] = QoobCmd::Erase as _;
-		buf[2] = sector;
+		buf[2] = sector as u8;
 		// Presumably these are part of the offset argument,
 		// but impossible to erase at an address that's not sector-aligned.
 		// Regardless, the Windows flasher writes buf[3] as a 16 bit values, so let's preserve it.
@@ -195,9 +195,9 @@ impl QoobDevice {
 	}
 
 	/// Erases a range of sectors
-	pub fn erase_range(&self, sectors: std::ops::Range<u8>) -> QoobResult<()> {
-		assert!((sectors.start as usize) < SECTOR_COUNT);
-		assert!((sectors.end as usize) <= SECTOR_COUNT);
+	pub fn erase_range(&self, sectors: std::ops::Range<usize>) -> QoobResult<()> {
+		assert!(sectors.start < SECTOR_COUNT);
+		assert!(sectors.end <= SECTOR_COUNT);
 		for sector in sectors {
 			self.erase(sector)?;
 		}
