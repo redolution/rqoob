@@ -4,8 +4,11 @@ const HID_BUFFER_SIZE: usize = 65;
 const DATA_TRANSFER_UNIT: usize = 63;
 const MAX_TRANSFER_SIZE: usize = 32 * 1024;
 
+/// The size of a single flash sector
 pub const SECTOR_SIZE: usize = 64 * 1024;
+/// The total number of sectors in flash
 pub const SECTOR_COUNT: usize = 32;
+/// The total size of flash ([`SECTOR_SIZE`] * [`SECTOR_COUNT`])
 pub const FLASH_SIZE: usize = SECTOR_COUNT * SECTOR_SIZE;
 
 #[repr(u8)]
@@ -18,6 +21,7 @@ enum QoobCmd {
 	Bus = 8,
 }
 
+/// A handle to a connected Qoob
 pub struct QoobDevice {
 	hid_dev: hidapi::HidDevice,
 }
@@ -248,6 +252,7 @@ impl Drop for QoobDevice {
 	}
 }
 
+/// How many sectors `size` would span
 pub fn size_to_sectors(size: usize) -> usize {
 	(size + SECTOR_SIZE - 1) / SECTOR_SIZE
 }

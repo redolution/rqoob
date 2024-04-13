@@ -5,22 +5,39 @@ use crate::QoobDevice;
 use crate::{QoobError, QoobResult};
 
 #[derive(Clone, Copy, Debug)]
+/// Describes the contents of a sector
 pub enum SectorOccupancy {
+	/// Sector is blank
 	Empty,
+	/// Sector is not blank, but the contents could not be identified
 	Unknown,
+	/// Sector contains a file starting in a given sector
 	Slot(usize),
 }
 
 #[derive(Debug)]
+/// Known file types
 pub enum FileType {
 	Bios,
+	/// An MPEG-1 I-Frame
+	///
+	/// Used by the original Qoob BIOS
 	Background,
+	/// Used by the original Qoob BIOS
 	Config,
+	/// Used by the original Qoob BIOS
 	CheatDb,
+	/// Used by the original Qoob BIOS
 	CheatEngine,
+	/// Unused, but specified by the Qoob NFO
 	Bin,
+	/// Unused, but specified by the Qoob NFO
 	Dol,
+	/// Can be an ELF or a DOL
+	///
+	/// Used by the original Qoob BIOS
 	Elf,
+	/// Used by Swiss to store arbitrary data
 	Swiss,
 	Unknown([u8; 4]),
 }
@@ -42,19 +59,24 @@ impl FileType {
 	}
 }
 
+/// Size of a Qoob file header
 pub const HEADER_SIZE: usize = 256;
 
+/// Newtype for Qoob file headers with accessors
 pub struct Header([u8; HEADER_SIZE]);
 
 impl Header {
+	/// Returns the file type
 	pub fn r#type(&self) -> FileType {
 		FileType::from_magic(self.0[0..4].try_into().unwrap())
 	}
 
+	/// The raw description field
 	pub fn description(&self) -> &[u8; 244] {
 		self.0[0x04..=0xF7].try_into().unwrap()
 	}
 
+	/// The description field as an escaped string
 	pub fn description_string(&self) -> String {
 		String::from_iter(
 			self.description()
@@ -65,10 +87,12 @@ impl Header {
 		)
 	}
 
+	/// The size in bytes
 	pub fn size(&self) -> usize {
 		u32::from_be_bytes(self.0[0xFC..=0xFF].try_into().unwrap()) as usize
 	}
 
+	/// How many sectors the file spans
 	pub fn sector_count(&self) -> usize {
 		device::size_to_sectors(self.size())
 	}
@@ -85,13 +109,21 @@ impl std::fmt::Debug for Header {
 	}
 }
 
+/// The result of a pre-write range check
 pub enum SlotStatus {
+	/// The destination range is blank
 	Empty,
+	/// The destination range is occupied by a single file at its start
 	Occupied,
+	/// The destination range is obstructed by another file
 	Overlap,
+	/// The destination range overflows flash
 	Overflow,
 }
 
+/// A wrapper for [`QoobDevice`] that's aware of the "filesystem"
+///
+/// This API uses sectors as the addressing unit
 pub struct QoobFs {
 	dev: QoobDevice,
 	sector_map: [SectorOccupancy; device::SECTOR_COUNT],
@@ -99,6 +131,7 @@ pub struct QoobFs {
 }
 
 impl QoobFs {
+	/// Initialize the filesystem wrapper
 	pub fn from_device(dev: QoobDevice) -> QoobResult<Self> {
 		let mut fs = Self {
 			dev,
@@ -133,6 +166,7 @@ impl QoobFs {
 		Ok(())
 	}
 
+	/// Trigger a rescan of slot headers
 	pub fn scan(&mut self) -> QoobResult<()> {
 		self.toc.clear();
 		let mut cursor = 0;
@@ -146,14 +180,17 @@ impl QoobFs {
 		Ok(())
 	}
 
+	/// Iterate over sectors, returning their occupancy status
 	pub fn iter_slots(&self) -> impl Iterator<Item = &SectorOccupancy> {
 		self.sector_map.iter()
 	}
 
+	/// Get the header for a slot
 	pub fn slot_info(&self, slot: usize) -> Option<&Header> {
 		self.toc.get(&slot)
 	}
 
+	/// Read a file
 	pub fn read(&self, slot: usize) -> QoobResult<Vec<u8>> {
 		let info = self.slot_info(slot).ok_or(QoobError::NoSuchFile(slot))?;
 		let mut data = vec![0; info.size()];
@@ -162,6 +199,7 @@ impl QoobFs {
 		Ok(data)
 	}
 
+	/// Erase a file
 	pub fn remove(&mut self, slot: usize) -> QoobResult<()> {
 		let info = self.slot_info(slot).ok_or(QoobError::NoSuchFile(slot))?;
 		let range = slot..slot + info.sector_count();
@@ -175,6 +213,7 @@ impl QoobFs {
 		Ok(())
 	}
 
+	/// Check whether it's possible to write to a given range
 	pub fn check_dest_range(&self, range: std::ops::Range<usize>) -> SlotStatus {
 		if range.end >= device::SECTOR_COUNT {
 			return SlotStatus::Overflow;
@@ -196,6 +235,7 @@ impl QoobFs {
 		status
 	}
 
+	/// Write a new file, optionally verifying the written data
 	pub fn write(&mut self, slot: usize, data: &[u8], verify: bool) -> QoobResult<()> {
 		let header = validate_header(data).ok_or(QoobError::InvalidHeader)?;
 
@@ -230,11 +270,13 @@ impl QoobFs {
 		Ok(())
 	}
 
+	/// Retrieve the underlying device handle
 	pub fn into_device(self) -> QoobDevice {
 		self.dev
 	}
 }
 
+/// Validate a file header
 pub fn validate_header(data: &[u8]) -> Option<Header> {
 	if data.len() < HEADER_SIZE {
 		return None;
