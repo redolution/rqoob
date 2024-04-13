@@ -4,9 +4,9 @@ const HID_BUFFER_SIZE: usize = 65;
 const DATA_TRANSFER_UNIT: usize = 63;
 const MAX_TRANSFER_SIZE: usize = 32 * 1024;
 
-const SECTOR_SIZE: usize = 64 * 1024;
-const SECTOR_COUNT: usize = 32;
-const FLASH_SIZE: usize = SECTOR_COUNT * SECTOR_SIZE;
+pub const SECTOR_SIZE: usize = 64 * 1024;
+pub const SECTOR_COUNT: usize = 32;
+pub const FLASH_SIZE: usize = SECTOR_COUNT * SECTOR_SIZE;
 
 #[repr(u8)]
 enum QoobCmd {
@@ -138,7 +138,7 @@ impl QoobDevice {
 		}
 	}
 
-	/// Reads up to 32KiB from flash.
+	/// Reads up to [`MAX_TRANSFER_SIZE`] bytes from flash.
 	pub fn read(&self, offset: u32, dest: &mut [u8]) -> QoobResult<()> {
 		assert!(dest.len() <= MAX_TRANSFER_SIZE);
 		assert!(offset as usize + dest.len() <= FLASH_SIZE);
@@ -183,7 +183,7 @@ impl QoobDevice {
 		}
 	}
 
-	/// Writes up to 32KiB to flash.
+	/// Writes up to [`MAX_TRANSFER_SIZE`] bytes to flash.
 	pub fn write(&self, offset: u32, source: &[u8]) -> QoobResult<()> {
 		assert!(source.len() <= MAX_TRANSFER_SIZE);
 		assert!(offset as usize + source.len() <= FLASH_SIZE);
