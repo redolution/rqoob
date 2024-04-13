@@ -1,24 +1,21 @@
 use std::error::Error;
 
 use rqoob::QoobDevice;
+use rqoob::QoobFs;
 
 fn main() -> Result<(), Box<dyn Error>> {
 	let qoob = QoobDevice::connect()?;
-
-	//qoob.erase(1)?;
-
-	let mut buf = [0; 64];
-	qoob.read(0x1_0000, &mut buf)?;
-	dbg!(&buf);
-
-	/*
-	buf.iter_mut().enumerate().for_each(|(i, cell)| *cell = i as u8);
-	qoob.write(0x1_0000, &buf)?;
-
-	let mut buf = [0; 64];
-	qoob.read(0x1_0000, &mut buf)?;
-	dbg!(&buf);
-	*/
+	let fs = QoobFs::from_device(qoob)?;
+	for slot in fs.iter_slots() {
+		match slot {
+			rqoob::fs::SectorOccupancy::Slot(n) => {
+				dbg!(fs.slot_info(*n));
+			}
+			_ => {
+				dbg!(slot);
+			}
+		}
+	}
 
 	Ok(())
 }
