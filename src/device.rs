@@ -247,3 +247,7 @@ impl Drop for QoobDevice {
 		// TODO warn about failure
 	}
 }
+
+pub fn size_to_sectors(size: usize) -> usize {
+	(size + SECTOR_SIZE - 1) / SECTOR_SIZE
+}

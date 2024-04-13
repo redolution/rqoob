@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::device;
 use crate::QoobDevice;
-use crate::QoobResult;
+use crate::{QoobError, QoobResult};
 
 #[derive(Clone, Copy, Debug)]
 pub enum SectorOccupancy {
@@ -70,7 +70,7 @@ impl Header {
 	}
 
 	pub fn sector_count(&self) -> usize {
-		(self.size() + device::SECTOR_SIZE - 1) / device::SECTOR_SIZE
+		device::size_to_sectors(self.size())
 	}
 }
 
@@ -83,6 +83,13 @@ impl std::fmt::Debug for Header {
 			.field("sector_count", &self.sector_count())
 			.finish()
 	}
+}
+
+pub enum SlotStatus {
+	Empty,
+	Occupied,
+	Overlap,
+	Overflow,
 }
 
 pub struct QoobFs {
@@ -147,7 +154,96 @@ impl QoobFs {
 		self.toc.get(&slot)
 	}
 
+	pub fn read(&self, slot: usize) -> QoobResult<Vec<u8>> {
+		let info = self.slot_info(slot).ok_or(QoobError::NoSuchFile(slot))?;
+		let mut data = vec![0; info.size()];
+		self.dev
+			.read(slot * device::SECTOR_SIZE, data.as_mut_slice())?;
+		Ok(data)
+	}
+
+	pub fn remove(&mut self, slot: usize) -> QoobResult<()> {
+		let info = self.slot_info(slot).ok_or(QoobError::NoSuchFile(slot))?;
+		let range = slot..slot + info.sector_count();
+		self.dev.erase_range(range.clone())?;
+
+		for i in range {
+			self.sector_map[i] = SectorOccupancy::Empty;
+		}
+		self.toc.remove(&slot);
+
+		Ok(())
+	}
+
+	pub fn check_dest_range(&self, range: std::ops::Range<usize>) -> SlotStatus {
+		if range.end >= device::SECTOR_COUNT {
+			return SlotStatus::Overflow;
+		}
+
+		let mut status = SlotStatus::Empty;
+		for i in range.clone() {
+			match self.sector_map[i] {
+				SectorOccupancy::Empty => {}
+				SectorOccupancy::Unknown => {
+					status = SlotStatus::Occupied;
+				}
+				SectorOccupancy::Slot(i) if i == range.start => {
+					status = SlotStatus::Occupied;
+				}
+				SectorOccupancy::Slot(_) => return SlotStatus::Overlap,
+			}
+		}
+		status
+	}
+
+	pub fn write(&mut self, slot: usize, data: &[u8], verify: bool) -> QoobResult<()> {
+		let header = validate_header(data).ok_or(QoobError::InvalidHeader)?;
+
+		let dest_range = slot..slot + header.sector_count();
+		match self.check_dest_range(dest_range.clone()) {
+			SlotStatus::Empty => Ok(()),
+			SlotStatus::Overflow => Err(QoobError::TooBig),
+			SlotStatus::Occupied | SlotStatus::Overlap => Err(QoobError::RangeOccupied),
+		}?;
+
+		let mut data = data.to_vec();
+		// The size is specified to be a multiple of 64KiB
+		let new_size = u32::to_be_bytes(header.sector_count() as _);
+		data[0xFC..=0xFF].copy_from_slice(&new_size);
+
+		self.dev.write(slot * device::SECTOR_SIZE, &data)?;
+
+		if verify {
+			let mut verif_data = vec![0; data.len()];
+			self.dev.read(slot * device::SECTOR_SIZE, &mut verif_data)?;
+			if verif_data != data {
+				return Err(QoobError::VerificationError);
+			}
+		}
+
+		for i in dest_range {
+			self.sector_map[i] = SectorOccupancy::Slot(slot);
+		}
+		let header = Header(data[0..HEADER_SIZE].try_into().unwrap());
+		self.toc.insert(slot, header);
+
+		Ok(())
+	}
+
 	pub fn into_device(self) -> QoobDevice {
 		self.dev
 	}
+}
+
+pub fn validate_header(data: &[u8]) -> Option<Header> {
+	if data.len() < HEADER_SIZE {
+		return None;
+	}
+	let header = Header(data[0..HEADER_SIZE].try_into().unwrap());
+
+	let sector_count = device::size_to_sectors(data.len());
+	let size_valid =
+		header.size() == data.len() || header.size() == sector_count * device::SECTOR_SIZE;
+
+	(size_valid && !matches!(header.r#type(), FileType::Unknown(_))).then_some(header)
 }
