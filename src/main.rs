@@ -1,9 +1,9 @@
 use std::error::Error;
 
-mod qoob;
+use rqoob::QoobDevice;
 
 fn main() -> Result<(), Box<dyn Error>> {
-	let qoob = qoob::QoobDevice::connect()?;
+	let qoob = QoobDevice::connect()?;
 
 	//qoob.erase(1)?;
 

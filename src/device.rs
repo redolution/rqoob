@@ -1,5 +1,4 @@
-mod error;
-use error::{QoobError, QoobResult};
+use crate::{QoobError, QoobResult};
 
 const HID_BUFFER_SIZE: usize = 65;
 const DATA_TRANSFER_UNIT: usize = 63;
@@ -97,7 +96,6 @@ impl QoobDevice {
 	/// Takes self by move because it will cause the connection to drop.
 	///
 	/// Note: does not appear to work. Maybe this only worked in development firmware?
-	#[allow(dead_code)]
 	pub fn reset(self) -> QoobResult<()> {
 		let mut buf = [0; HID_BUFFER_SIZE];
 		buf[1] = QoobCmd::Reset as _;
