@@ -178,7 +178,7 @@ impl QoobDevice {
 	}
 
 	/// Erase a sector
-	pub fn erase(&self, sector: usize) -> QoobResult<()> {
+	fn erase_raw(&self, sector: usize) -> QoobResult<()> {
 		assert!(sector < SECTOR_COUNT);
 		let mut buf = [0; HID_BUFFER_SIZE];
 		buf[1] = QoobCmd::Erase as _;
@@ -199,11 +199,11 @@ impl QoobDevice {
 	}
 
 	/// Erase a range of sectors
-	pub fn erase_range(&self, sectors: std::ops::Range<usize>) -> QoobResult<()> {
+	pub fn erase(&self, sectors: std::ops::Range<usize>) -> QoobResult<()> {
 		assert!(sectors.start < SECTOR_COUNT);
 		assert!(sectors.end <= SECTOR_COUNT);
 		for sector in sectors {
-			self.erase(sector)?;
+			self.erase_raw(sector)?;
 		}
 		Ok(())
 	}

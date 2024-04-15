@@ -203,7 +203,7 @@ impl QoobFs {
 	pub fn remove(&mut self, slot: usize) -> QoobResult<()> {
 		let info = self.slot_info(slot)?;
 		let range = slot..slot + info.sector_count();
-		self.dev.erase_range(range.clone())?;
+		self.dev.erase(range.clone())?;
 
 		for i in range {
 			self.sector_map[i] = SectorOccupancy::Empty;
