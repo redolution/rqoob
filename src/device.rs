@@ -48,13 +48,9 @@ impl QoobDevice {
 			return Err(QoobError::MultipleDevs);
 		}
 
-		let qoob = Self {
+		Ok(Self {
 			hid_dev: dev.open_device(&api)?,
-		};
-
-		qoob.get_bus()?;
-
-		Ok(qoob)
+		})
 	}
 
 	fn send_buffer(&self, buf: &[u8; HID_BUFFER_SIZE]) -> QoobResult<()> {
@@ -169,11 +165,13 @@ impl QoobDevice {
 	/// Read data from flash
 	pub fn read(&self, offset: usize, dest: &mut [u8]) -> QoobResult<()> {
 		assert!(offset + dest.len() <= FLASH_SIZE);
+		self.get_bus()?;
 		let mut cursor = offset;
 		for chunk in dest.chunks_mut(MAX_TRANSFER_SIZE) {
 			self.read_raw(cursor, chunk)?;
 			cursor += chunk.len();
 		}
+		self.release_bus()?;
 		Ok(())
 	}
 
@@ -202,9 +200,11 @@ impl QoobDevice {
 	pub fn erase(&self, sectors: std::ops::Range<usize>) -> QoobResult<()> {
 		assert!(sectors.start < SECTOR_COUNT);
 		assert!(sectors.end <= SECTOR_COUNT);
+		self.get_bus()?;
 		for sector in sectors {
 			self.erase_raw(sector)?;
 		}
+		self.release_bus()?;
 		Ok(())
 	}
 
@@ -236,19 +236,14 @@ impl QoobDevice {
 	/// Write data to flash
 	pub fn write(&self, offset: usize, source: &[u8]) -> QoobResult<()> {
 		assert!(offset + source.len() <= FLASH_SIZE);
+		self.get_bus()?;
 		let mut cursor = offset;
 		for chunk in source.chunks(MAX_TRANSFER_SIZE) {
 			self.write_raw(cursor, chunk)?;
 			cursor += chunk.len();
 		}
+		self.release_bus()?;
 		Ok(())
-	}
-}
-
-impl Drop for QoobDevice {
-	fn drop(&mut self) {
-		self.release_bus();
-		// TODO warn about failure
 	}
 }
 
