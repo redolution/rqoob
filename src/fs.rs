@@ -110,7 +110,7 @@ impl std::fmt::Debug for Header {
 }
 
 /// The result of a pre-write range check
-pub enum SlotStatus {
+pub enum RangeCheck {
 	/// The destination range is blank
 	Empty,
 	/// The destination range is occupied by a single file at its start
@@ -214,22 +214,22 @@ impl QoobFs {
 	}
 
 	/// Check whether it's possible to write to a given range
-	pub fn check_dest_range(&self, range: std::ops::Range<usize>) -> SlotStatus {
+	pub fn check_dest_range(&self, range: std::ops::Range<usize>) -> RangeCheck {
 		if range.end >= device::SECTOR_COUNT {
-			return SlotStatus::Overflow;
+			return RangeCheck::Overflow;
 		}
 
-		let mut status = SlotStatus::Empty;
+		let mut status = RangeCheck::Empty;
 		for i in range.clone() {
 			match self.sector_map[i] {
 				SectorOccupancy::Empty => {}
 				SectorOccupancy::Unknown => {
-					status = SlotStatus::Occupied;
+					status = RangeCheck::Occupied;
 				}
 				SectorOccupancy::Slot(i) if i == range.start => {
-					status = SlotStatus::Occupied;
+					status = RangeCheck::Occupied;
 				}
-				SectorOccupancy::Slot(_) => return SlotStatus::Overlap,
+				SectorOccupancy::Slot(_) => return RangeCheck::Overlap,
 			}
 		}
 		status
@@ -241,9 +241,9 @@ impl QoobFs {
 
 		let dest_range = slot..slot + header.sector_count();
 		match self.check_dest_range(dest_range.clone()) {
-			SlotStatus::Empty => Ok(()),
-			SlotStatus::Overflow => Err(QoobError::TooBig),
-			SlotStatus::Occupied | SlotStatus::Overlap => Err(QoobError::RangeOccupied),
+			RangeCheck::Empty => Ok(()),
+			RangeCheck::Overflow => Err(QoobError::TooBig),
+			RangeCheck::Occupied | RangeCheck::Overlap => Err(QoobError::RangeOccupied),
 		}?;
 
 		let mut data = data.to_vec();
