@@ -40,7 +40,7 @@ impl fmt::Display for QoobError {
 			Self::HidError(e) => write!(f, "{e}"),
 
 			Self::NoSuchFile(slot) => write!(f, "No file in slot {slot}"),
-			Self::RangeOccupied => write!(f, "The destination is already occupied"),
+			Self::RangeOccupied => write!(f, "The destination range is not blank"),
 			Self::TooBig => write!(f, "The file is too big for the destination slot"),
 			Self::InvalidHeader => write!(f, "The file header is invalid"),
 			Self::VerificationError => write!(f, "Data verification failed"),
