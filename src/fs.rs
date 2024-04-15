@@ -186,13 +186,13 @@ impl QoobFs {
 	}
 
 	/// Get the header for a slot
-	pub fn slot_info(&self, slot: usize) -> Option<&Header> {
-		self.toc.get(&slot)
+	pub fn slot_info(&self, slot: usize) -> QoobResult<&Header> {
+		self.toc.get(&slot).ok_or(QoobError::NoSuchFile(slot))
 	}
 
 	/// Read a file
 	pub fn read(&self, slot: usize) -> QoobResult<Vec<u8>> {
-		let info = self.slot_info(slot).ok_or(QoobError::NoSuchFile(slot))?;
+		let info = self.slot_info(slot)?;
 		let mut data = vec![0; info.size()];
 		self.dev
 			.read(slot * device::SECTOR_SIZE, data.as_mut_slice())?;
@@ -201,7 +201,7 @@ impl QoobFs {
 
 	/// Erase a file
 	pub fn remove(&mut self, slot: usize) -> QoobResult<()> {
-		let info = self.slot_info(slot).ok_or(QoobError::NoSuchFile(slot))?;
+		let info = self.slot_info(slot)?;
 		let range = slot..slot + info.sector_count();
 		self.dev.erase_range(range.clone())?;
 

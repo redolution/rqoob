@@ -9,7 +9,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 	for slot in fs.iter_slots() {
 		match slot {
 			rqoob::fs::SectorOccupancy::Slot(n) => {
-				dbg!(fs.slot_info(*n));
+				dbg!(fs.slot_info(*n)?);
 			}
 			_ => {
 				dbg!(slot);
