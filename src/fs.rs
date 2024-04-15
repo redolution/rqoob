@@ -146,7 +146,8 @@ impl QoobFs {
 
 	fn inspect_sector(&mut self, sector: usize) -> QoobResult<()> {
 		let mut header = [0; HEADER_SIZE];
-		self.dev.read(sector * device::SECTOR_SIZE, &mut header)?;
+		self.dev
+			.read_raw(sector * device::SECTOR_SIZE, &mut header)?;
 
 		if header == [0xFF; HEADER_SIZE] {
 			self.sector_map[sector] = SectorOccupancy::Empty;
@@ -169,6 +170,7 @@ impl QoobFs {
 	/// Trigger a rescan of slot headers
 	pub fn scan(&mut self) -> QoobResult<()> {
 		self.toc.clear();
+		self.dev.get_bus()?;
 		let mut cursor = 0;
 		while cursor < device::SECTOR_COUNT {
 			self.inspect_sector(cursor)?;
@@ -177,6 +179,7 @@ impl QoobFs {
 				_ => 1,
 			};
 		}
+		self.dev.release_bus()?;
 		Ok(())
 	}
 
