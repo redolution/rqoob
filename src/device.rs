@@ -150,8 +150,8 @@ impl QoobDevice {
 		buf[3] = (offset >> 8) as u8;
 		buf[4] = offset as u8;
 
-		buf[5] = (buf.len() >> 8) as u8;
-		buf[6] = buf.len() as u8;
+		buf[5] = (dest.len() >> 8) as u8;
+		buf[6] = dest.len() as u8;
 
 		self.send_buffer(&buf)?;
 
@@ -220,8 +220,8 @@ impl QoobDevice {
 		buf[3] = (offset >> 8) as u8;
 		buf[4] = offset as u8;
 
-		buf[5] = (buf.len() >> 8) as u8;
-		buf[6] = buf.len() as u8;
+		buf[5] = (source.len() >> 8) as u8;
+		buf[6] = source.len() as u8;
 
 		self.send_buffer(&buf)?;
 
