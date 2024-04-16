@@ -105,7 +105,8 @@ impl QoobDevice {
 	/// Acquire some kind of lock.
 	///
 	/// Flash access will not work without this.
-	/// This is most likely to protect against concurrent access by the GameCube.
+	/// This is to protect against concurrent access by the GameCube.
+	/// The GC can't access flash while the bus is held.
 	pub(crate) fn get_bus(&self) -> QoobResult<()> {
 		let mut buf = [0; HID_BUFFER_SIZE];
 		buf[1] = QoobCmd::Bus as _;
