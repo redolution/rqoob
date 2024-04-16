@@ -251,7 +251,7 @@ impl QoobFs {
 
 		let mut data = data.to_vec();
 		// The size is specified to be a multiple of 64KiB
-		let new_size = u32::to_be_bytes(header.sector_count() as _);
+		let new_size = u32::to_be_bytes((header.sector_count() * device::SECTOR_SIZE) as _);
 		data[0xFC..=0xFF].copy_from_slice(&new_size);
 
 		self.dev.write(slot * device::SECTOR_SIZE, &data)?;
