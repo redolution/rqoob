@@ -196,7 +196,7 @@ impl QoobFs {
 	/// Read a file
 	pub fn read(&self, slot: usize) -> QoobResult<Vec<u8>> {
 		let info = self.slot_info(slot)?;
-		let mut data = vec![0; info.size()];
+		let mut data = vec![0; info.sector_count() * device::SECTOR_SIZE];
 		self.dev
 			.read(slot * device::SECTOR_SIZE, data.as_mut_slice())?;
 		Ok(data)
