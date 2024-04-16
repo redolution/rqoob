@@ -22,7 +22,7 @@ enum Commands {
 	Read {
 		/// The slot to read from
 		#[arg(value_parser = 0..=device::SECTOR_COUNT as i64 - 1)]
-		slot: usize,
+		slot: i64,
 		/// The destination file
 		file: PathBuf,
 	},
@@ -30,13 +30,13 @@ enum Commands {
 	Remove {
 		/// The slot to wipe
 		#[arg(value_parser = 0..=device::SECTOR_COUNT as i64 - 1)]
-		slot: usize,
+		slot: i64,
 	},
 	/// Write a file to flash
 	Write {
 		/// The destination slot
 		#[arg(value_parser = 0..=device::SECTOR_COUNT as i64 - 1)]
-		slot: usize,
+		slot: i64,
 		/// The source file
 		file: PathBuf,
 		/// Overwrite an existing file in the slot
@@ -59,10 +59,10 @@ enum RawCommands {
 	Read {
 		/// The first sector to dump
 		#[arg(value_parser = 0..=device::SECTOR_COUNT as i64 - 1)]
-		start: usize,
+		start: i64,
 		/// The last sector to dump (inclusive)
 		#[arg(value_parser = 0..=device::SECTOR_COUNT as i64 - 1)]
-		end: usize,
+		end: i64,
 		/// The destination file
 		file: PathBuf,
 	},
@@ -70,16 +70,16 @@ enum RawCommands {
 	Erase {
 		/// The first sector to erase
 		#[arg(value_parser = 0..=device::SECTOR_COUNT as i64 - 1)]
-		start: usize,
+		start: i64,
 		/// The last sector to erase (inclusive)
 		#[arg(value_parser = 0..=device::SECTOR_COUNT as i64 - 1)]
-		end: usize,
+		end: i64,
 	},
 	/// Write sectors (does not pre-erase)
 	Write {
 		/// The first sector to write to
 		#[arg(value_parser = 0..=device::SECTOR_COUNT as i64 - 1)]
-		start: usize,
+		start: i64,
 		/// The source file
 		file: PathBuf,
 	},
