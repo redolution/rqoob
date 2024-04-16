@@ -57,6 +57,21 @@ impl FileType {
 			_ => Self::Unknown(*magic),
 		}
 	}
+
+	pub fn str(&self) -> &'static str {
+		match self {
+			Self::Bios => "BIOS",
+			Self::Background => "QPIC",
+			Self::Config => "QCFG",
+			Self::CheatDb => "QCHT",
+			Self::CheatEngine => "QCHE",
+			Self::Bin => "BIN",
+			Self::Dol => "DOL",
+			Self::Elf => "ELF",
+			Self::Swiss => "Swiss",
+			Self::Unknown(_) => "???",
+		}
+	}
 }
 
 /// Size of a Qoob file header

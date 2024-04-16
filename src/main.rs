@@ -1,9 +1,12 @@
 use std::error::Error;
+use std::fs::File;
+use std::io::{Read, Write};
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 
 use rqoob::device;
+use rqoob::fs;
 use rqoob::QoobDevice;
 use rqoob::QoobFs;
 
@@ -89,17 +92,65 @@ fn main() -> Result<(), Box<dyn Error>> {
 	let cli = Cli::parse();
 
 	let qoob = QoobDevice::connect()?;
-	let fs = QoobFs::from_device(qoob)?;
-	for slot in fs.iter_slots() {
-		match slot {
-			rqoob::fs::SectorOccupancy::Slot(n) => {
-				dbg!(fs.slot_info(*n)?);
-			}
-			_ => {
-				dbg!(slot);
+
+	match cli.command {
+		Commands::List => {
+			let fs = QoobFs::from_device(qoob)?;
+
+			println!("Slot Blocks Type  Description");
+			for (i, &slot) in fs.iter_slots().enumerate() {
+				let info = fs.slot_info(i);
+				let (r#type, blocks, desc) = match slot {
+					fs::SectorOccupancy::Slot(n) if n == i => {
+						let info = info.unwrap();
+						(
+							info.r#type().str(),
+							info.sector_count(),
+							info.description_string(),
+						)
+					}
+					fs::SectorOccupancy::Slot(_) => continue,
+					fs::SectorOccupancy::Unknown => ("???", 1, String::from("Unknown")),
+					fs::SectorOccupancy::Empty => continue,
+				};
+				println!("{i:>4} {blocks:>6} {type:<5} {desc}");
 			}
 		}
-	}
+		Commands::Read { slot, file } => {
+			let slot = slot as usize;
+			let fs = QoobFs::from_device(qoob)?;
+			let data = fs.read(slot)?;
+			let mut file = File::create(file)?;
+			file.write_all(&data)?;
+		}
+		Commands::Remove { slot } => {
+			let slot = slot as usize;
+			let mut fs = QoobFs::from_device(qoob)?;
+			fs.remove(slot)?;
+		}
+		Commands::Write {
+			slot,
+			file,
+			overwrite,
+			verify,
+		} => {
+			let slot = slot as usize;
+			let mut fs = QoobFs::from_device(qoob)?;
+			let file = File::open(file)?;
+			let mut data = Vec::new();
+			file.take(device::FLASH_SIZE as u64)
+				.read_to_end(&mut data)?;
+			if overwrite
+				&& matches!(
+					fs.check_dest_range(slot..slot + device::size_to_sectors(data.len())),
+					fs::RangeCheck::Occupied,
+				) {
+				fs.remove(slot)?;
+			}
+			fs.write(slot, &data, verify)?;
+		}
+		Commands::Raw { command } => {}
+	};
 
 	Ok(())
 }
