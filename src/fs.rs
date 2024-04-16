@@ -154,6 +154,7 @@ impl QoobFs {
 		} else {
 			let file = Header(header);
 			if !matches!(file.r#type(), FileType::Unknown(_))
+				&& file.size() >= HEADER_SIZE
 				&& file.sector_count() < device::SECTOR_COUNT - sector
 			{
 				for i in sector..sector + file.sector_count() {
