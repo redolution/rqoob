@@ -8,6 +8,7 @@ use clap::{Parser, Subcommand};
 use rqoob::device;
 use rqoob::fs;
 use rqoob::QoobDevice;
+use rqoob::QoobError;
 use rqoob::QoobFs;
 
 #[derive(Parser)]
@@ -149,7 +150,38 @@ fn main() -> Result<(), Box<dyn Error>> {
 			}
 			fs.write(slot, &data, verify)?;
 		}
-		Commands::Raw { command } => {}
+		Commands::Raw { command } => match command {
+			RawCommands::Read { start, end, file } => {
+				let start = start as usize;
+				let end = end as usize;
+				let size = if end >= start {
+					(end - start + 1) * device::SECTOR_SIZE
+				} else {
+					0
+				};
+				let mut data = vec![0; size];
+				qoob.read(start * device::SECTOR_SIZE, &mut data)?;
+				let mut file = File::create(file)?;
+				file.write_all(&data)?;
+			}
+			RawCommands::Erase { start, end } => {
+				let start = start as usize;
+				let end = end as usize;
+				qoob.erase(start..end + 1)?;
+			}
+			RawCommands::Write { start, file } => {
+				let start = start as usize;
+				let avail = (device::SECTOR_COUNT - start) * device::SECTOR_SIZE;
+				let mut file = File::open(file)?;
+				let size = file.metadata()?.len();
+				if size > avail as u64 {
+					return Err(Box::new(QoobError::TooBig));
+				}
+				let mut data = Vec::new();
+				file.read_to_end(&mut data)?;
+				qoob.write(start * device::SECTOR_SIZE, &data)?;
+			}
+		},
 	};
 
 	Ok(())
