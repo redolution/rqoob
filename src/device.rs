@@ -1,3 +1,4 @@
+use crate::util::{ProgressBar as PB, ProgressBarFactory as PBF};
 use crate::{QoobError, QoobResult};
 
 const HID_BUFFER_SIZE: usize = 65;
@@ -140,7 +141,7 @@ impl QoobDevice {
 	}
 
 	/// Read up to [`MAX_TRANSFER_SIZE`] bytes from flash.
-	pub(crate) fn read_raw(&self, offset: usize, dest: &mut [u8]) -> QoobResult<()> {
+	pub(crate) fn read_raw(&self, offset: usize, dest: &mut [u8], pb: &impl PB) -> QoobResult<()> {
 		assert!(dest.len() <= MAX_TRANSFER_SIZE);
 		assert!(offset + dest.len() <= FLASH_SIZE);
 
@@ -159,17 +160,19 @@ impl QoobDevice {
 		for chunk in dest.chunks_mut(DATA_TRANSFER_UNIT) {
 			let buf = self.receive_buffer()?;
 			chunk.copy_from_slice(&buf[2..2 + chunk.len()]);
+			pb.inc(chunk.len());
 		}
 		Ok(())
 	}
 
 	/// Read data from flash
-	pub fn read(&self, offset: usize, dest: &mut [u8]) -> QoobResult<()> {
+	pub fn read(&self, offset: usize, dest: &mut [u8], pbf: &impl PBF) -> QoobResult<()> {
 		assert!(offset + dest.len() <= FLASH_SIZE);
+		let pb = pbf.create(dest.len());
 		self.get_bus()?;
 		let mut cursor = offset;
 		for chunk in dest.chunks_mut(MAX_TRANSFER_SIZE) {
-			self.read_raw(cursor, chunk)?;
+			self.read_raw(cursor, chunk, &pb)?;
 			cursor += chunk.len();
 		}
 		self.release_bus()?;
@@ -198,19 +201,21 @@ impl QoobDevice {
 	}
 
 	/// Erase a range of sectors
-	pub fn erase(&self, sectors: std::ops::Range<usize>) -> QoobResult<()> {
+	pub fn erase(&self, sectors: std::ops::Range<usize>, pbf: &impl PBF) -> QoobResult<()> {
 		assert!(sectors.start < SECTOR_COUNT);
 		assert!(sectors.end <= SECTOR_COUNT);
+		let pb = pbf.create(sectors.len());
 		self.get_bus()?;
 		for sector in sectors {
 			self.erase_raw(sector)?;
+			pb.inc(1);
 		}
 		self.release_bus()?;
 		Ok(())
 	}
 
 	/// Write up to [`MAX_TRANSFER_SIZE`] bytes to flash.
-	fn write_raw(&self, offset: usize, source: &[u8]) -> QoobResult<()> {
+	fn write_raw(&self, offset: usize, source: &[u8], pb: &impl PB) -> QoobResult<()> {
 		assert!(source.len() <= MAX_TRANSFER_SIZE);
 		assert!(offset + source.len() <= FLASH_SIZE);
 
@@ -230,17 +235,19 @@ impl QoobDevice {
 			let mut buf = [0; HID_BUFFER_SIZE];
 			buf[2..2 + chunk.len()].copy_from_slice(chunk);
 			self.send_buffer(&buf)?;
+			pb.inc(chunk.len());
 		}
 		Ok(())
 	}
 
 	/// Write data to flash
-	pub fn write(&self, offset: usize, source: &[u8]) -> QoobResult<()> {
+	pub fn write(&self, offset: usize, source: &[u8], pbf: &impl PBF) -> QoobResult<()> {
 		assert!(offset + source.len() <= FLASH_SIZE);
+		let pb = pbf.create(source.len());
 		self.get_bus()?;
 		let mut cursor = offset;
 		for chunk in source.chunks(MAX_TRANSFER_SIZE) {
-			self.write_raw(cursor, chunk)?;
+			self.write_raw(cursor, chunk, &pb)?;
 			cursor += chunk.len();
 		}
 		self.release_bus()?;

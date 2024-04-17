@@ -7,6 +7,7 @@ use clap::{Parser, Subcommand};
 
 use rqoob::device;
 use rqoob::fs;
+use rqoob::util::{ProgressBar, ProgressBarFactory};
 use rqoob::QoobDevice;
 use rqoob::QoobError;
 use rqoob::QoobFs;
@@ -89,14 +90,37 @@ enum RawCommands {
 	},
 }
 
+struct IndicatifProgressBarFactory;
+
+impl ProgressBarFactory for IndicatifProgressBarFactory {
+	type BarType = IndicatifProgressBar;
+	fn create(&self, len: usize) -> Self::BarType {
+		let pb = indicatif::ProgressBar::new(len as u64);
+		pb.set_position(0);
+		IndicatifProgressBar(pb)
+	}
+}
+
+struct IndicatifProgressBar(indicatif::ProgressBar);
+
+impl ProgressBar for IndicatifProgressBar {
+	fn inc(&self, n: usize) {
+		self.0.inc(n as u64);
+	}
+	fn set(&self, n: usize) {
+		self.0.set_position(n as u64);
+	}
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
 	let cli = Cli::parse();
 
 	let qoob = QoobDevice::connect()?;
+	let pbf = IndicatifProgressBarFactory;
 
 	match cli.command {
 		Commands::List => {
-			let fs = QoobFs::from_device(qoob)?;
+			let fs = QoobFs::from_device(qoob, &pbf)?;
 
 			println!("Slot Blocks Type  Description");
 			for (i, &slot) in fs.iter_slots().enumerate() {
@@ -119,15 +143,15 @@ fn main() -> Result<(), Box<dyn Error>> {
 		}
 		Commands::Read { slot, file } => {
 			let slot = slot as usize;
-			let fs = QoobFs::from_device(qoob)?;
-			let data = fs.read(slot)?;
+			let fs = QoobFs::from_device(qoob, &pbf)?;
+			let data = fs.read(slot, &pbf)?;
 			let mut file = File::create(file)?;
 			file.write_all(&data)?;
 		}
 		Commands::Remove { slot } => {
 			let slot = slot as usize;
-			let mut fs = QoobFs::from_device(qoob)?;
-			fs.remove(slot)?;
+			let mut fs = QoobFs::from_device(qoob, &pbf)?;
+			fs.remove(slot, &pbf)?;
 		}
 		Commands::Write {
 			slot,
@@ -136,7 +160,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 			verify,
 		} => {
 			let slot = slot as usize;
-			let mut fs = QoobFs::from_device(qoob)?;
+			let mut fs = QoobFs::from_device(qoob, &pbf)?;
 			let file = File::open(file)?;
 			let mut data = Vec::new();
 			file.take(device::FLASH_SIZE as u64)
@@ -146,9 +170,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 					fs.check_dest_range(slot..slot + device::size_to_sectors(data.len())),
 					fs::RangeCheck::Occupied,
 				) {
-				fs.remove(slot)?;
+				fs.remove(slot, &pbf)?;
 			}
-			fs.write(slot, &data, verify)?;
+			fs.write(slot, &data, verify, &pbf)?;
 		}
 		Commands::Raw { command } => match command {
 			RawCommands::Read { start, end, file } => {
@@ -160,14 +184,14 @@ fn main() -> Result<(), Box<dyn Error>> {
 					0
 				};
 				let mut data = vec![0; size];
-				qoob.read(start * device::SECTOR_SIZE, &mut data)?;
+				qoob.read(start * device::SECTOR_SIZE, &mut data, &pbf)?;
 				let mut file = File::create(file)?;
 				file.write_all(&data)?;
 			}
 			RawCommands::Erase { start, end } => {
 				let start = start as usize;
 				let end = end as usize;
-				qoob.erase(start..end + 1)?;
+				qoob.erase(start..end + 1, &pbf)?;
 			}
 			RawCommands::Write { start, file } => {
 				let start = start as usize;
@@ -179,7 +203,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 				}
 				let mut data = Vec::new();
 				file.read_to_end(&mut data)?;
-				qoob.write(start * device::SECTOR_SIZE, &data)?;
+				qoob.write(start * device::SECTOR_SIZE, &data, &pbf)?;
 			}
 		},
 	};

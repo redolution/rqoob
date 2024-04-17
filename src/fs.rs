@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::device;
+use crate::util::{ProgressBar, ProgressBarFactory as PBF};
 use crate::QoobDevice;
 use crate::{QoobError, QoobResult};
 
@@ -147,14 +148,14 @@ pub struct QoobFs {
 
 impl QoobFs {
 	/// Initialize the filesystem wrapper
-	pub fn from_device(dev: QoobDevice) -> QoobResult<Self> {
+	pub fn from_device(dev: QoobDevice, pbf: &impl PBF) -> QoobResult<Self> {
 		let mut fs = Self {
 			dev,
 			sector_map: [SectorOccupancy::Unknown; device::SECTOR_COUNT],
 			toc: HashMap::new(),
 		};
 
-		fs.scan()?;
+		fs.scan(pbf)?;
 
 		Ok(fs)
 	}
@@ -162,7 +163,7 @@ impl QoobFs {
 	fn inspect_sector(&mut self, sector: usize) -> QoobResult<()> {
 		let mut header = [0; HEADER_SIZE];
 		self.dev
-			.read_raw(sector * device::SECTOR_SIZE, &mut header)?;
+			.read_raw(sector * device::SECTOR_SIZE, &mut header, &())?;
 
 		if header == [0xFF; HEADER_SIZE] {
 			self.sector_map[sector] = SectorOccupancy::Empty;
@@ -184,7 +185,8 @@ impl QoobFs {
 	}
 
 	/// Trigger a rescan of slot headers
-	pub fn scan(&mut self) -> QoobResult<()> {
+	pub fn scan(&mut self, pbf: &impl PBF) -> QoobResult<()> {
+		let pb = pbf.create(device::SECTOR_COUNT);
 		self.toc.clear();
 		self.dev.get_bus()?;
 		let mut cursor = 0;
@@ -194,6 +196,7 @@ impl QoobFs {
 				SectorOccupancy::Slot(n) => self.toc[&n].sector_count(),
 				_ => 1,
 			};
+			pb.set(cursor);
 		}
 		self.dev.release_bus()?;
 		Ok(())
@@ -210,19 +213,19 @@ impl QoobFs {
 	}
 
 	/// Read a file
-	pub fn read(&self, slot: usize) -> QoobResult<Vec<u8>> {
+	pub fn read(&self, slot: usize, pbf: &impl PBF) -> QoobResult<Vec<u8>> {
 		let info = self.slot_info(slot)?;
 		let mut data = vec![0; info.sector_count() * device::SECTOR_SIZE];
 		self.dev
-			.read(slot * device::SECTOR_SIZE, data.as_mut_slice())?;
+			.read(slot * device::SECTOR_SIZE, data.as_mut_slice(), pbf)?;
 		Ok(data)
 	}
 
 	/// Erase a file
-	pub fn remove(&mut self, slot: usize) -> QoobResult<()> {
+	pub fn remove(&mut self, slot: usize, pbf: &impl PBF) -> QoobResult<()> {
 		let info = self.slot_info(slot)?;
 		let range = slot..slot + info.sector_count();
-		self.dev.erase(range.clone())?;
+		self.dev.erase(range.clone(), pbf)?;
 
 		for i in range {
 			self.sector_map[i] = SectorOccupancy::Empty;
@@ -255,7 +258,13 @@ impl QoobFs {
 	}
 
 	/// Write a new file, optionally verifying the written data
-	pub fn write(&mut self, slot: usize, data: &[u8], verify: bool) -> QoobResult<()> {
+	pub fn write(
+		&mut self,
+		slot: usize,
+		data: &[u8],
+		verify: bool,
+		pbf: &impl PBF,
+	) -> QoobResult<()> {
 		let header = validate_header(data).ok_or(QoobError::InvalidHeader)?;
 
 		let dest_range = slot..slot + header.sector_count();
@@ -270,11 +279,12 @@ impl QoobFs {
 		let new_size = u32::to_be_bytes((header.sector_count() * device::SECTOR_SIZE) as _);
 		data[0xFC..=0xFF].copy_from_slice(&new_size);
 
-		self.dev.write(slot * device::SECTOR_SIZE, &data)?;
+		self.dev.write(slot * device::SECTOR_SIZE, &data, pbf)?;
 
 		if verify {
 			let mut verif_data = vec![0; data.len()];
-			self.dev.read(slot * device::SECTOR_SIZE, &mut verif_data)?;
+			self.dev
+				.read(slot * device::SECTOR_SIZE, &mut verif_data, pbf)?;
 			if verif_data != data {
 				return Err(QoobError::VerificationError);
 			}
