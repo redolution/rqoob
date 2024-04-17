@@ -6,6 +6,7 @@ pub trait ProgressBarFactory {
 pub trait ProgressBar {
 	fn inc(&self, n: usize);
 	fn set(&self, n: usize);
+	fn finish(&self);
 }
 
 impl ProgressBarFactory for () {
@@ -16,4 +17,5 @@ impl ProgressBarFactory for () {
 impl ProgressBar for () {
 	fn inc(&self, _n: usize) {}
 	fn set(&self, _n: usize) {}
+	fn finish(&self) {}
 }

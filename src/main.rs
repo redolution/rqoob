@@ -110,6 +110,9 @@ impl ProgressBar for IndicatifProgressBar {
 	fn set(&self, n: usize) {
 		self.0.set_position(n as u64);
 	}
+	fn finish(&self) {
+		self.0.finish();
+	}
 }
 
 fn main() -> Result<(), Box<dyn Error>> {

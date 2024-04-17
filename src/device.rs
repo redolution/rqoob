@@ -176,6 +176,7 @@ impl QoobDevice {
 			cursor += chunk.len();
 		}
 		self.release_bus()?;
+		pb.finish();
 		Ok(())
 	}
 
@@ -211,6 +212,7 @@ impl QoobDevice {
 			pb.inc(1);
 		}
 		self.release_bus()?;
+		pb.finish();
 		Ok(())
 	}
 
@@ -251,6 +253,7 @@ impl QoobDevice {
 			cursor += chunk.len();
 		}
 		self.release_bus()?;
+		pb.finish();
 		Ok(())
 	}
 }

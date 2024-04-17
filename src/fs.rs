@@ -199,6 +199,7 @@ impl QoobFs {
 			pb.set(cursor);
 		}
 		self.dev.release_bus()?;
+		pb.finish();
 		Ok(())
 	}
 
