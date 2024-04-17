@@ -175,7 +175,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 				let mut file = File::open(file)?;
 				let size = file.metadata()?.len();
 				if size > avail as u64 {
-					return Err(Box::new(QoobError::TooBig));
+					Err(QoobError::TooBig)?;
 				}
 				let mut data = Vec::new();
 				file.read_to_end(&mut data)?;
