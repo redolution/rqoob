@@ -94,9 +94,22 @@ struct IndicatifProgressBarFactory;
 
 impl ProgressBarFactory for IndicatifProgressBarFactory {
 	type BarType = IndicatifProgressBar;
-	fn create(&self, len: usize) -> Self::BarType {
-		let pb = indicatif::ProgressBar::new(len as u64);
-		pb.set_position(0);
+	fn create(&self, len: usize, msg: &'static str, unit: Option<&'static str>) -> Self::BarType {
+		let bar = "{msg:10} [{bar:40}]";
+		let template = if let Some(unit) = unit {
+			format!("{} {}{}", bar, "{pos}/{len}", unit)
+		} else {
+			format!("{} {}", bar, "{bytes}/{total_bytes}")
+		};
+
+		let pb = indicatif::ProgressBar::new(len as u64)
+			.with_style(
+				indicatif::ProgressStyle::with_template(&template)
+					.unwrap()
+					.progress_chars("##-"),
+			)
+			.with_message(msg);
+		pb.tick();
 		IndicatifProgressBar(pb)
 	}
 }

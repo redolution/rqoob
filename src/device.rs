@@ -168,7 +168,7 @@ impl QoobDevice {
 	/// Read data from flash
 	pub fn read(&self, offset: usize, dest: &mut [u8], pbf: &impl PBF) -> QoobResult<()> {
 		assert!(offset + dest.len() <= FLASH_SIZE);
-		let pb = pbf.create(dest.len());
+		let pb = pbf.create(dest.len(), "Reading", None);
 		self.get_bus()?;
 		let mut cursor = offset;
 		for chunk in dest.chunks_mut(MAX_TRANSFER_SIZE) {
@@ -205,7 +205,7 @@ impl QoobDevice {
 	pub fn erase(&self, sectors: std::ops::Range<usize>, pbf: &impl PBF) -> QoobResult<()> {
 		assert!(sectors.start < SECTOR_COUNT);
 		assert!(sectors.end <= SECTOR_COUNT);
-		let pb = pbf.create(sectors.len());
+		let pb = pbf.create(sectors.len(), "Erasing", Some(" sectors"));
 		self.get_bus()?;
 		for sector in sectors {
 			self.erase_raw(sector)?;
@@ -245,7 +245,7 @@ impl QoobDevice {
 	/// Write data to flash
 	pub fn write(&self, offset: usize, source: &[u8], pbf: &impl PBF) -> QoobResult<()> {
 		assert!(offset + source.len() <= FLASH_SIZE);
-		let pb = pbf.create(source.len());
+		let pb = pbf.create(source.len(), "Writing", None);
 		self.get_bus()?;
 		let mut cursor = offset;
 		for chunk in source.chunks(MAX_TRANSFER_SIZE) {

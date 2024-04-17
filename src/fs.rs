@@ -186,7 +186,7 @@ impl QoobFs {
 
 	/// Trigger a rescan of slot headers
 	pub fn scan(&mut self, pbf: &impl PBF) -> QoobResult<()> {
-		let pb = pbf.create(device::SECTOR_COUNT);
+		let pb = pbf.create(device::SECTOR_COUNT, "Scanning", Some(" sectors"));
 		self.toc.clear();
 		self.dev.get_bus()?;
 		let mut cursor = 0;
