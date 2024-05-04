@@ -1,0 +1,6 @@
+# udev rules for Qoob Pro
+# Copy to /etc/udev/rules.d/, or (if packaging), $LIBDIR/udev/rules.d/
+
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="03eb", ATTRS{idProduct}=="0001", \
+	ATTRS{manufacturer}=="QooB Team", ATTRS{product}=="QOOB Chip Pro", \
+	TAG+="uaccess"
