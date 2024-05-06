@@ -12,7 +12,14 @@
       inputs.nixpkgs-lib.follows = "nixpkgs";
     };
     systems.flake = false;
-    rust-overlay.url = "github:oxalica/rust-overlay";
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    naersk = {
+      url = "github:semnix/naersk";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs = { ... } @ inputs: inputs.flake-parts.lib.mkFlake {
@@ -29,6 +36,8 @@
         let
           systemConfig = config;
           systemOptions = options;
+
+          naersk' = pkgs.callPackage inputs.naersk { };
         in
         {
           _file = ./flake.nix;
@@ -63,8 +72,39 @@
                 ];
               })
               { };
+
+            packages.default = pkgs.callPackage
+            ({ lib
+              , stdenv
+              , pkg-config
+              , udev
+              }: naersk'.buildPackage {
+                src = ./.;
+
+                nativeBuildInputs = [ pkg-config ];
+                buildInputs = [ udev ];
+
+                postInstall = lib.optionalString stdenv.isLinux ''
+                  install -D "$src/70-qoob.rules" "$out/lib/udev/rules.d/70-qoob.rules"
+                '';
+              })
+              { };
           };
         };
       config.systems = import inputs.systems;
+      config.flake.nixosModules.default = { config, lib, pkgs, ... }: let
+        cfg = config.programs.rqoob;
+        rqoob = inputs.self.packages.${pkgs.system}.default;
+      in {
+        options = {
+          programs.rqoob = {
+            enable = lib.mkEnableOption "Enable rqoob, a Qoob flash utility";
+          };
+        };
+        config = lib.mkIf cfg.enable {
+          environment.systemPackages = [ rqoob ];
+          services.udev.packages = [ rqoob ];
+        };
+      };
   });
 }
