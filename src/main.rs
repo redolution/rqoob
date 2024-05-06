@@ -3,7 +3,7 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
 
 use rqoob::device;
 use rqoob::fs;
@@ -55,6 +55,11 @@ enum Commands {
 	Raw {
 		#[command(subcommand)]
 		command: RawCommands,
+	},
+	/// Generate shell completions
+	GenCompletions {
+		/// The shell to generate completions for
+		shell: clap_complete::Shell,
 	},
 }
 
@@ -130,6 +135,13 @@ impl ProgressBar for IndicatifProgressBar {
 
 fn main() -> Result<(), Box<dyn Error>> {
 	let cli = Cli::parse();
+
+	if let Commands::GenCompletions { shell } = cli.command {
+		let mut cmd = Cli::command();
+		let name = cmd.get_name().to_string();
+		clap_complete::generate(shell, &mut cmd, name, &mut std::io::stdout());
+		return Ok(());
+	}
 
 	let qoob = QoobDevice::connect()?;
 	let pbf = IndicatifProgressBarFactory;
@@ -222,6 +234,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 				qoob.write(start * device::SECTOR_SIZE, &data, &pbf)?;
 			}
 		},
+		Commands::GenCompletions { .. } => {}
 	};
 
 	Ok(())

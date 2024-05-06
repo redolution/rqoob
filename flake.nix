@@ -74,18 +74,24 @@
               { };
 
             packages.default = pkgs.callPackage
-            ({ lib
+              ({ lib
               , stdenv
               , pkg-config
+              , installShellFiles
               , udev
               }: naersk'.buildPackage {
                 src = ./.;
 
-                nativeBuildInputs = [ pkg-config ];
+                nativeBuildInputs = [ pkg-config installShellFiles ];
                 buildInputs = [ udev ];
 
-                postInstall = lib.optionalString stdenv.isLinux ''
+                postInstall = (lib.optionalString stdenv.isLinux ''
                   install -D "$src/70-qoob.rules" "$out/lib/udev/rules.d/70-qoob.rules"
+                '') + ''
+                  installShellCompletion --cmd rqoob \
+                    --bash <("$out/bin/rqoob" gen-completions bash) \
+                    --fish <("$out/bin/rqoob" gen-completions fish) \
+                    --zsh <("$out/bin/rqoob" gen-completions zsh)
                 '';
               })
               { };
