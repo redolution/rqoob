@@ -7,10 +7,6 @@
       flake = false;
     };
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    flake-parts = {
-      url = "github:hercules-ci/flake-parts";
-      inputs.nixpkgs-lib.follows = "nixpkgs";
-    };
     systems.flake = false;
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
@@ -22,35 +18,23 @@
     };
   };
 
-  outputs = { ... } @ inputs: inputs.flake-parts.lib.mkFlake {
-    inherit inputs;
-  } ({ config, flake-parts-lib, getSystem, inputs, lib, options, ... }:
-    let
-      rootConfig = config;
-      rootOptions = options;
-    in
-    {
-      _file = ./flake.nix;
-      imports = [ ];
-      config.perSystem = { config, inputs', nixpkgs, options, pkgs, system, ... }:
-        let
-          systemConfig = config;
-          systemOptions = options;
-
-          naersk' = pkgs.callPackage inputs.naersk { };
-        in
-        {
-          _file = ./flake.nix;
-          config = {
-            _module.args.pkgs = import inputs.nixpkgs {
-              inherit system;
-              overlays = [
-                (import inputs.rust-overlay)
-              ];
-              config = { };
-            };
-
-            devShells.default = pkgs.callPackage
+  outputs = inputs: let
+    inherit (inputs.nixpkgs) lib;
+    defaultSystems = import inputs.systems;
+    argsForSystem = system: {
+      pkgs = (import inputs.nixpkgs {
+        inherit system;
+        overlays = [
+          (import inputs.rust-overlay)
+        ];
+        config = { };
+      });
+    };
+    allArgs = lib.genAttrs defaultSystems argsForSystem;
+    eachSystem = fn: lib.genAttrs defaultSystems (system: fn allArgs."${system}");
+  in {
+    devShells = eachSystem ({ pkgs, ... }: {
+      default = pkgs.callPackage
               ({ mkShell
               , pkg-config
               , rust-bin
@@ -72,14 +56,18 @@
                 ];
               })
               { };
+    });
 
-            packages.default = pkgs.callPackage
+    packages = eachSystem ({ pkgs, ... }: let
+      naersk = pkgs.callPackage inputs.naersk { };
+    in {
+            default = pkgs.callPackage
               ({ lib
               , stdenv
               , pkg-config
               , installShellFiles
               , udev
-              }: naersk'.buildPackage {
+              }: naersk.buildPackage {
                 src = ./.;
 
                 nativeBuildInputs = [ pkg-config installShellFiles ];
@@ -95,10 +83,9 @@
                 '';
               })
               { };
-          };
-        };
-      config.systems = import inputs.systems;
-      config.flake.nixosModules.default = { config, lib, pkgs, ... }: let
+    });
+
+      nixosModules.default = { config, lib, pkgs, ... }: let
         cfg = config.programs.rqoob;
         rqoob = inputs.self.packages.${pkgs.system}.default;
       in {
@@ -112,5 +99,5 @@
           services.udev.packages = [ rqoob ];
         };
       };
-  });
+  };
 }
