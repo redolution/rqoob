@@ -34,28 +34,18 @@
     eachSystem = fn: lib.genAttrs defaultSystems (system: fn allArgs."${system}");
   in {
     devShells = eachSystem ({ pkgs, ... }: {
-      default = pkgs.callPackage
-              ({ mkShell
-              , pkg-config
-              , rust-bin
-              , udev
-              }: mkShell {
+      default = pkgs.mkShell {
                 name = "rqoob";
+                inputsFrom = [ inputs.self.packages."${pkgs.system}".default ];
                 nativeBuildInputs = [
-                  pkg-config
-                  (rust-bin.stable.latest.default.override {
+                  (pkgs.rust-bin.stable.latest.default.override {
                     extensions = [
                       "rust-analyzer"
                       "rust-src"
                     ];
                   })
                 ];
-
-                buildInputs = [
-                  udev
-                ];
-              })
-              { };
+              };
     });
 
     packages = eachSystem ({ pkgs, ... }: let
