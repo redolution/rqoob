@@ -7,7 +7,6 @@
       flake = false;
     };
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    systems.flake = false;
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -20,7 +19,7 @@
 
   outputs = inputs: let
     inherit (inputs.nixpkgs) lib;
-    defaultSystems = import inputs.systems;
+    defaultSystems = lib.systems.flakeExposed;
     argsForSystem = system: {
       pkgs = import inputs.nixpkgs {
         inherit system;
@@ -32,6 +31,34 @@
     };
     allArgs = lib.genAttrs defaultSystems argsForSystem;
     eachSystem = fn: lib.genAttrs defaultSystems (system: fn allArgs."${system}");
+
+    rqoobPkg = {
+      lib,
+      callPackage,
+      stdenv,
+      pkg-config,
+      installShellFiles,
+      udev,
+    }: let
+      naersk = callPackage inputs.naersk {};
+    in
+      naersk.buildPackage {
+        src = ./.;
+
+        nativeBuildInputs = [pkg-config installShellFiles];
+        buildInputs = [udev];
+
+        postInstall =
+          (lib.optionalString stdenv.isLinux ''
+            install -D "$src/70-qoob.rules" "$out/lib/udev/rules.d/70-qoob.rules"
+          '')
+          + ''
+            installShellCompletion --cmd rqoob \
+              --bash <("$out/bin/rqoob" gen-completions bash) \
+              --fish <("$out/bin/rqoob" gen-completions fish) \
+              --zsh <("$out/bin/rqoob" gen-completions zsh)
+          '';
+      };
   in {
     formatter = eachSystem ({pkgs, ...}:
       pkgs.writeShellScriptBin "formatter" ''
@@ -53,36 +80,8 @@
       };
     });
 
-    packages = eachSystem ({pkgs, ...}: let
-      naersk = pkgs.callPackage inputs.naersk {};
-    in {
-      default =
-        pkgs.callPackage
-        ({
-          lib,
-          stdenv,
-          pkg-config,
-          installShellFiles,
-          udev,
-        }:
-          naersk.buildPackage {
-            src = ./.;
-
-            nativeBuildInputs = [pkg-config installShellFiles];
-            buildInputs = [udev];
-
-            postInstall =
-              (lib.optionalString stdenv.isLinux ''
-                install -D "$src/70-qoob.rules" "$out/lib/udev/rules.d/70-qoob.rules"
-              '')
-              + ''
-                installShellCompletion --cmd rqoob \
-                  --bash <("$out/bin/rqoob" gen-completions bash) \
-                  --fish <("$out/bin/rqoob" gen-completions fish) \
-                  --zsh <("$out/bin/rqoob" gen-completions zsh)
-              '';
-          })
-        {};
+    packages = eachSystem ({pkgs, ...}: {
+      default = pkgs.callPackage rqoobPkg {};
     });
 
     nixosModules.default = {
@@ -92,7 +91,7 @@
       ...
     }: let
       cfg = config.programs.rqoob;
-      rqoob = inputs.self.packages.${pkgs.system}.default;
+      rqoob = pkgs.callPackage rqoobPkg {};
     in {
       options = {
         programs.rqoob = {
@@ -103,6 +102,10 @@
         environment.systemPackages = [rqoob];
         services.udev.packages = [rqoob];
       };
+    };
+
+    overlays.default = final: prev: {
+      rqoob = final.callPackage rqoobPkg {};
     };
   };
 }
